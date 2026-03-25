@@ -7,37 +7,23 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #1a1a2e; color: #eee; height: 100vh; display: flex; flex-direction: column; }
+    body { font-family: sans-serif; background: #1a1a2e; color: #eee; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
     /* ── Login ── */
     #login-screen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      gap: 12px;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100vh; gap: 12px;
     }
     #login-screen h1 { font-size: 1.4rem; margin-bottom: 8px; }
     #login-screen input {
-      padding: 10px 16px;
-      border-radius: 8px;
-      border: none;
-      font-size: 1rem;
-      width: 260px;
-      background: #16213e;
-      color: #fff;
-      outline: 2px solid #4285F4;
+      padding: 10px 16px; border-radius: 8px; border: none;
+      font-size: 1rem; width: 260px; background: #16213e;
+      color: #fff; outline: 2px solid #4285F4;
     }
     #login-screen button {
-      padding: 10px 32px;
-      background: #4285F4;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-      width: 260px;
+      padding: 10px 32px; background: #4285F4; color: #fff;
+      border: none; border-radius: 8px; font-size: 1rem;
+      cursor: pointer; width: 260px;
     }
     #login-screen button:hover { background: #3367d6; }
     #login-error { color: #ff6b6b; font-size: 0.85rem; min-height: 1em; }
@@ -45,44 +31,61 @@
     /* ── Panel ── */
     #panel { display: none; flex-direction: column; height: 100vh; }
 
+    /* ── Topbar ── */
     #topbar {
-      background: #16213e;
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
+      background: #16213e; padding: 8px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0; gap: 8px; flex-wrap: wrap;
     }
-    #topbar h1 { font-size: 1rem; }
-    #topbar span { font-size: 0.8rem; color: #aaa; }
+    #topbar h1 { font-size: 0.95rem; white-space: nowrap; }
+    #topbar-btns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
-    #content {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
+    /* ── Config bar ── */
+    #config-bar {
+      background: #0f3460; padding: 7px 12px;
+      display: flex; align-items: center; gap: 6px;
+      flex-shrink: 0; border-bottom: 1px solid #2a2a4a; flex-wrap: wrap;
     }
+    #config-bar label { font-size: 0.78rem; color: #aaa; white-space: nowrap; }
+    #config-bar input {
+      flex: 1; min-width: 120px; padding: 4px 8px; border-radius: 6px;
+      border: none; background: #16213e; color: #fff;
+      font-size: 0.78rem; outline: 1px solid #4285F4;
+    }
+    #url-msg { font-size: 0.72rem; color: #2ecc71; }
 
-    /* ── Lista lateral ── */
+    /* ── Área principal ── */
+    #content { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+    /* ── Mapa ── */
+    #map { flex: 1; }
+
+    /* ── Sidebar desktop ── */
     #sidebar {
-      width: 280px;
-      background: #16213e;
-      overflow-y: auto;
-      flex-shrink: 0;
+      width: 280px; background: #16213e;
+      overflow-y: auto; flex-shrink: 0;
       border-right: 1px solid #2a2a4a;
+      transition: width 0.25s;
     }
+    #sidebar.collapsed { width: 0; overflow: hidden; }
     #sidebar h2 {
-      padding: 10px 14px;
-      font-size: 0.85rem;
-      color: #aaa;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      padding: 10px 14px; font-size: 0.85rem; color: #aaa;
+      text-transform: uppercase; letter-spacing: 1px;
       border-bottom: 1px solid #2a2a4a;
     }
+
+    /* ── Botón toggle sidebar (desktop) ── */
+    #btn-toggle-sidebar {
+      position: absolute; top: 10px; left: 10px; z-index: 1000;
+      background: #16213e; color: #fff; border: 1px solid #2a2a4a;
+      border-radius: 6px; padding: 5px 10px; cursor: pointer;
+      font-size: 0.8rem; display: block;
+    }
+
+    /* ── Items de la lista ── */
     .ubicacion-item {
-      padding: 10px 14px;
-      border-bottom: 1px solid #2a2a4a;
-      cursor: pointer;
-      transition: background 0.15s;
+      padding: 10px 14px; border-bottom: 1px solid #2a2a4a;
+      cursor: pointer; transition: background 0.15s;
     }
     .ubicacion-item:hover { background: #0f3460; }
     .ubicacion-item.active { background: #0f3460; border-left: 3px solid #4285F4; }
@@ -90,80 +93,67 @@
     .ubicacion-item .fecha { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
     .ubicacion-item .coords { font-size: 0.8rem; margin-top: 3px; }
     .ubicacion-item a {
-      display: inline-block;
-      margin-top: 4px;
-      font-size: 0.75rem;
-      color: #4285F4;
+      display: inline-block; margin-top: 4px;
+      font-size: 0.75rem; color: #4285F4;
     }
-    #empty-msg {
-      padding: 20px 14px;
-      color: #aaa;
-      font-size: 0.85rem;
-    }
+    #empty-msg { padding: 20px 14px; color: #aaa; font-size: 0.85rem; }
 
-    /* ── Mapa ── */
-    #map { flex: 1; }
-
-    /* ── Botones ── */
-    #btn-refresh, #btn-delete-all {
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 5px 14px;
-      cursor: pointer;
-      font-size: 0.85rem;
-    }
+    /* ── Botones generales ── */
+    .btn { color: #fff; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
     #btn-refresh { background: #4285F4; }
     #btn-refresh:hover { background: #3367d6; }
     #btn-delete-all { background: #c0392b; }
     #btn-delete-all:hover { background: #a93226; }
-
-    /* ── Config URL ── */
-    #config-bar {
-      background: #0f3460;
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-      border-bottom: 1px solid #2a2a4a;
-    }
-    #config-bar label { font-size: 0.8rem; color: #aaa; white-space: nowrap; }
-    #config-bar input {
-      flex: 1;
-      padding: 5px 10px;
-      border-radius: 6px;
-      border: none;
-      background: #16213e;
-      color: #fff;
-      font-size: 0.8rem;
-      outline: 1px solid #4285F4;
-    }
-    #btn-save-url {
-      background: #27ae60;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 5px 14px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      white-space: nowrap;
-    }
+    #btn-save-url { background: #27ae60; }
     #btn-save-url:hover { background: #1e8449; }
-    #url-msg { font-size: 0.75rem; color: #2ecc71; min-width: 60px; }
 
-    /* ── Botón eliminar por item ── */
     .btn-del {
-      background: none;
-      border: 1px solid #c0392b;
-      color: #e74c3c;
-      border-radius: 4px;
-      padding: 2px 8px;
-      cursor: pointer;
-      font-size: 0.7rem;
-      margin-top: 5px;
+      background: none; border: 1px solid #c0392b; color: #e74c3c;
+      border-radius: 4px; padding: 2px 8px; cursor: pointer;
+      font-size: 0.7rem; margin-top: 5px;
     }
     .btn-del:hover { background: #c0392b; color: #fff; }
+
+    /* ════════════════════════════
+       MÓVIL
+       ════════════════════════════ */
+    @media (max-width: 600px) {
+      /* Ocultar sidebar normal y toggle desktop */
+      #sidebar { display: none; }
+      #btn-toggle-sidebar { display: none; }
+
+      /* ── Drawer desde abajo ── */
+      #drawer {
+        position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000;
+        background: #16213e; border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+        max-height: 70vh; display: flex; flex-direction: column;
+        transform: translateY(calc(100% - 44px));
+        transition: transform 0.3s ease;
+      }
+      #drawer.open { transform: translateY(0); }
+
+      /* Tirador */
+      #drawer-handle {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 16px; height: 44px; cursor: pointer; flex-shrink: 0;
+        border-bottom: 1px solid #2a2a4a;
+      }
+      #drawer-handle::before {
+        content: ''; position: absolute; left: 50%; transform: translateX(-50%);
+        top: 8px; width: 36px; height: 4px;
+        background: #555; border-radius: 2px;
+      }
+      #drawer-handle span { font-size: 0.85rem; font-weight: bold; color: #eee; }
+      #drawer-handle .arrow { font-size: 0.75rem; color: #aaa; }
+
+      #drawer-body { overflow-y: auto; flex: 1; }
+    }
+
+    /* Desktop: ocultar drawer */
+    @media (min-width: 601px) {
+      #drawer { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -179,25 +169,43 @@
   <!-- PANEL -->
   <div id="panel">
     <div id="topbar">
-      <h1>📍 Ubicaciones recibidas</h1>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span id="total-label">0 registros</span>
-        <button id="btn-refresh">↻ Actualizar</button>
-        <button id="btn-delete-all">🗑 Eliminar todo</button>
+      <h1>📍 Ubicaciones</h1>
+      <div id="topbar-btns">
+        <span id="total-label" style="font-size:0.8rem;color:#aaa;">0 registros</span>
+        <button id="btn-refresh" class="btn">↻</button>
+        <button id="btn-delete-all" class="btn">🗑 Todo</button>
       </div>
     </div>
     <div id="config-bar">
-      <label>URL de redirección:</label>
+      <label>URL redirección:</label>
       <input type="text" id="redirect-url-input" placeholder="https://..." />
-      <button id="btn-save-url">Guardar</button>
+      <button id="btn-save-url" class="btn">Guardar</button>
       <span id="url-msg"></span>
     </div>
+
     <div id="content">
+      <!-- Toggle sidebar (desktop) -->
+      <button id="btn-toggle-sidebar">☰ Lista</button>
+
+      <!-- Sidebar desktop -->
       <div id="sidebar">
         <h2>Lista</h2>
-        <div id="lista"></div>
+        <div id="lista-desktop"></div>
       </div>
+
+      <!-- Mapa -->
       <div id="map"></div>
+
+      <!-- Drawer móvil -->
+      <div id="drawer">
+        <div id="drawer-handle">
+          <span id="drawer-label">Lista · 0</span>
+          <span class="arrow" id="drawer-arrow">▲</span>
+        </div>
+        <div id="drawer-body">
+          <div id="lista-mobile"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -238,12 +246,26 @@
 
       map = L.map('map').setView([19.4326, -99.1332], 5);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors', maxZoom: 19,
       }).addTo(map);
 
       cargarUbicaciones();
       cargarConfig();
+
+      // Toggle sidebar desktop
+      document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('collapsed');
+        setTimeout(() => map.invalidateSize(), 260);
+      });
+
+      // Drawer móvil
+      document.getElementById('drawer-handle').addEventListener('click', () => {
+        const drawer = document.getElementById('drawer');
+        const arrow  = document.getElementById('drawer-arrow');
+        drawer.classList.toggle('open');
+        arrow.textContent = drawer.classList.contains('open') ? '▼' : '▲';
+      });
+
       document.getElementById('btn-refresh').addEventListener('click', cargarUbicaciones);
 
       document.getElementById('btn-delete-all').addEventListener('click', async () => {
@@ -288,34 +310,13 @@
       }
     }
 
-    function renderizar(datos) {
-      // Limpiar marcadores anteriores
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
-
-      const lista = document.getElementById('lista');
-      lista.innerHTML = '';
-      document.getElementById('total-label').textContent = `${datos.length} registro${datos.length !== 1 ? 's' : ''}`;
-
+    function crearItems(datos, contenedor) {
+      contenedor.innerHTML = '';
       if (datos.length === 0) {
-        lista.innerHTML = '<p id="empty-msg">Aún no hay ubicaciones recibidas.</p>';
+        contenedor.innerHTML = '<p id="empty-msg" style="padding:20px 14px;color:#aaa;font-size:0.85rem;">Aún no hay ubicaciones recibidas.</p>';
         return;
       }
-
       datos.forEach((u, i) => {
-        // Marcador en el mapa
-        const marker = L.marker([u.lat, u.lng])
-          .addTo(map)
-          .bindPopup(`
-            <b>Visita #${i + 1}</b><br>
-            ${u.fecha}<br>
-            Lat: ${u.lat.toFixed(6)}<br>
-            Lng: ${u.lng.toFixed(6)}<br>
-            <a href="${u.mapa}" target="_blank">Ver en Google Maps</a>
-          `);
-        markers.push(marker);
-
-        // Item en la lista lateral
         const item = document.createElement('div');
         item.className = 'ubicacion-item';
         item.innerHTML = `
@@ -337,16 +338,46 @@
           document.querySelectorAll('.ubicacion-item').forEach(el => el.classList.remove('active'));
           item.classList.add('active');
           map.setView([u.lat, u.lng], 16);
-          marker.openPopup();
+          markers[i] && markers[i].openPopup();
+          // En móvil cerrar el drawer al seleccionar
+          const drawer = document.getElementById('drawer');
+          if (drawer.classList.contains('open')) {
+            drawer.classList.remove('open');
+            document.getElementById('drawer-arrow').textContent = '▲';
+          }
         });
-        lista.appendChild(item);
+        contenedor.appendChild(item);
+      });
+    }
+
+    function renderizar(datos) {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      const total = `${datos.length} registro${datos.length !== 1 ? 's' : ''}`;
+      document.getElementById('total-label').textContent = total;
+      document.getElementById('drawer-label').textContent = `Lista · ${datos.length}`;
+
+      // Marcadores
+      datos.forEach((u, i) => {
+        const marker = L.marker([u.lat, u.lng])
+          .addTo(map)
+          .bindPopup(`
+            <b>Visita #${i + 1}</b><br>
+            ${u.fecha}<br>
+            Lat: ${u.lat.toFixed(6)}<br>Lng: ${u.lng.toFixed(6)}<br>
+            <a href="${u.mapa}" target="_blank">Ver en Google Maps</a>
+          `);
+        markers.push(marker);
       });
 
-      // Ajustar vista del mapa para mostrar todos los marcadores
       if (markers.length > 0) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.3));
+        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.3));
       }
+
+      // Poblar ambas listas
+      crearItems(datos, document.getElementById('lista-desktop'));
+      crearItems(datos, document.getElementById('lista-mobile'));
     }
   </script>
 </body>
