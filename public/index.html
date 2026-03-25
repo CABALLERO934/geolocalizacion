@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi Mapa</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { font-family: sans-serif; background: #f0f4f8; }
+
+    #map { width: 100vw; height: 100vh; }
+
+    /* ── Bolita azul pulsante (como Google Maps) ── */
+    .blue-dot-wrapper {
+      position: relative;
+      width: 24px;
+      height: 24px;
+    }
+    .blue-dot {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px; height: 16px;
+      background: #4285F4;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(66,133,244,0.6);
+      z-index: 2;
+    }
+    .blue-dot-pulse {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px; height: 16px;
+      background: rgba(66,133,244,0.35);
+      border-radius: 50%;
+      animation: pulse 2s ease-out infinite;
+      z-index: 1;
+    }
+    @keyframes pulse {
+      0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.8; }
+      100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0;   }
+    }
+
+    /* ── Barra de estado ── */
+    #status-bar {
+      position: fixed;
+      bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.72);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      z-index: 1000;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+    #status-bar.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="status-bar">Obteniendo ubicación...</div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    /* ══════════════════════════════════════════
+       LUGARES DE INTERÉS — edita esta lista
+       ══════════════════════════════════════════ */
+    const LUGARES = [
+      {
+        nombre: "Tacos El Güero",
+        tipo: "comida",
+        lat: 19.4326,
+        lng: -99.1332,
+        descripcion: "Los mejores tacos de la zona"
+      },
+      {
+        nombre: "Pizzería La Nonna",
+        tipo: "comida",
+        lat: 19.4350,
+        lng: -99.1400,
+        descripcion: "Pizza artesanal, abierto hasta las 11 pm"
+      },
+      {
+        nombre: "Café Central",
+        tipo: "cafe",
+        lat: 19.4310,
+        lng: -99.1360,
+        descripcion: "Café de especialidad y postres"
+      },
+      {
+        nombre: "Parque Principal",
+        tipo: "parque",
+        lat: 19.4295,
+        lng: -99.1310,
+        descripcion: "Área verde con juegos"
+      },
+    ];
+    /* ══════════════════════════════════════════ */
+
+    // Iconos por tipo de lugar
+    const ICONOS = {
+      comida:  { emoji: "🍽️", color: "#e74c3c" },
+      cafe:    { emoji: "☕",  color: "#8B4513" },
+      parque:  { emoji: "🌳",  color: "#27ae60" },
+      default: { emoji: "📍",  color: "#e67e22" },
+    };
+
+    function crearIconoLugar(tipo) {
+      const { emoji, color } = ICONOS[tipo] || ICONOS.default;
+      return L.divIcon({
+        className: '',
+        html: `
+          <div style="
+            background:${color};
+            color:#fff;
+            border-radius:50% 50% 50% 0;
+            transform:rotate(-45deg);
+            width:36px; height:36px;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 2px 6px rgba(0,0,0,0.3);
+            font-size:16px;
+          ">
+            <span style="transform:rotate(45deg)">${emoji}</span>
+          </div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36],
+        popupAnchor: [0, -38],
+      });
+    }
+
+    const blueDotIcon = L.divIcon({
+      className: '',
+      html: `<div class="blue-dot-wrapper">
+               <div class="blue-dot-pulse"></div>
+               <div class="blue-dot"></div>
+             </div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, -14],
+    });
+
+    // ── Iniciar mapa ──
+    const map = L.map('map', { zoomControl: true }).setView([19.4326, -99.1332], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    // ── Agregar lugares de interés ──
+    LUGARES.forEach(lugar => {
+      L.marker([lugar.lat, lugar.lng], { icon: crearIconoLugar(lugar.tipo) })
+        .addTo(map)
+        .bindPopup(`
+          <b>${lugar.nombre}</b><br>
+          <small style="color:#666">${lugar.tipo}</small><br>
+          ${lugar.descripcion}
+        `);
+    });
+
+    // ── Geolocalización ──
+    const statusBar = document.getElementById('status-bar');
+    let userMarker = null;
+    let accuracyCircle = null;
+    let watchId = null;
+    let deadline = null;
+    let readings = [];
+    const GOOD_M = 15, MAX_WAIT = 30000, MAX_USE = 100;
+
+    function weightedAvg() {
+      const pool = readings.filter(r => r.accuracy <= MAX_USE);
+      const src  = pool.length ? pool : readings;
+      let wLat = 0, wLng = 0, wSum = 0;
+      src.forEach(r => {
+        const w = 1 / (r.accuracy * r.accuracy);
+        wLat += r.lat * w; wLng += r.lng * w; wSum += w;
+      });
+      return { lat: wLat / wSum, lng: wLng / wSum,
+               accuracy: Math.sqrt(1 / wSum) };
+    }
+
+    function updateUserMarker(lat, lng, accuracy) {
+      if (userMarker) {
+        userMarker.setLatLng([lat, lng]);
+        accuracyCircle.setLatLng([lat, lng]).setRadius(accuracy);
+      } else {
+        map.setView([lat, lng], 17);
+        userMarker = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 })
+          .addTo(map)
+          .bindPopup('<b>Tu ubicación</b>');
+        accuracyCircle = L.circle([lat, lng], {
+          radius: accuracy, color: '#4285F4',
+          fillOpacity: 0.1, weight: 1,
+        }).addTo(map);
+      }
+    }
+
+    function finish() {
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      clearTimeout(deadline);
+      if (!readings.length) return;
+      const { lat, lng, accuracy } = weightedAvg();
+      updateUserMarker(lat, lng, accuracy);
+      statusBar.textContent = `Tu ubicación (±${Math.round(accuracy)} m)`;
+      setTimeout(() => statusBar.classList.add('hidden'), 3000);
+    }
+
+    function onWatch(pos) {
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      readings.push({ lat, lng, accuracy });
+      const best = readings.reduce((a, b) => a.accuracy < b.accuracy ? a : b);
+      updateUserMarker(best.lat, best.lng, best.accuracy);
+      statusBar.textContent = `Obteniendo ubicación... ±${Math.round(best.accuracy)} m`;
+      if (best.accuracy <= GOOD_M) finish();
+    }
+
+    function onError(err) {
+      clearTimeout(deadline);
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      if (err.code === err.PERMISSION_DENIED) {
+        statusBar.textContent = '❌ Permiso denegado';
+      } else if (readings.length) {
+        finish();
+      } else {
+        statusBar.textContent = '❌ No se pudo obtener la ubicación';
+      }
+    }
+
+    if ('geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition(onWatch, onError, {
+        enableHighAccuracy: true, timeout: 20000, maximumAge: 0,
+      });
+      deadline = setTimeout(() => { if (watchId !== null) finish(); }, MAX_WAIT);
+    } else {
+      statusBar.textContent = '❌ Geolocalización no soportada';
+    }
+  </script>
+</body>
+</html>
