@@ -104,9 +104,8 @@
     /* ── Mapa ── */
     #map { flex: 1; }
 
-    /* ── Botón refrescar ── */
-    #btn-refresh {
-      background: #4285F4;
+    /* ── Botones ── */
+    #btn-refresh, #btn-delete-all {
       color: #fff;
       border: none;
       border-radius: 6px;
@@ -114,7 +113,57 @@
       cursor: pointer;
       font-size: 0.85rem;
     }
+    #btn-refresh { background: #4285F4; }
     #btn-refresh:hover { background: #3367d6; }
+    #btn-delete-all { background: #c0392b; }
+    #btn-delete-all:hover { background: #a93226; }
+
+    /* ── Config URL ── */
+    #config-bar {
+      background: #0f3460;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #2a2a4a;
+    }
+    #config-bar label { font-size: 0.8rem; color: #aaa; white-space: nowrap; }
+    #config-bar input {
+      flex: 1;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: none;
+      background: #16213e;
+      color: #fff;
+      font-size: 0.8rem;
+      outline: 1px solid #4285F4;
+    }
+    #btn-save-url {
+      background: #27ae60;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    #btn-save-url:hover { background: #1e8449; }
+    #url-msg { font-size: 0.75rem; color: #2ecc71; min-width: 60px; }
+
+    /* ── Botón eliminar por item ── */
+    .btn-del {
+      background: none;
+      border: 1px solid #c0392b;
+      color: #e74c3c;
+      border-radius: 4px;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      margin-top: 5px;
+    }
+    .btn-del:hover { background: #c0392b; color: #fff; }
   </style>
 </head>
 <body>
@@ -134,7 +183,14 @@
       <div style="display:flex;align-items:center;gap:10px">
         <span id="total-label">0 registros</span>
         <button id="btn-refresh">↻ Actualizar</button>
+        <button id="btn-delete-all">🗑 Eliminar todo</button>
       </div>
+    </div>
+    <div id="config-bar">
+      <label>URL de redirección:</label>
+      <input type="text" id="redirect-url-input" placeholder="https://..." />
+      <button id="btn-save-url">Guardar</button>
+      <span id="url-msg"></span>
     </div>
     <div id="content">
       <div id="sidebar">
@@ -187,7 +243,36 @@
       }).addTo(map);
 
       cargarUbicaciones();
+      cargarConfig();
       document.getElementById('btn-refresh').addEventListener('click', cargarUbicaciones);
+
+      document.getElementById('btn-delete-all').addEventListener('click', async () => {
+        if (!confirm('¿Eliminar todos los registros?')) return;
+        await fetch('/api/ubicaciones', {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        cargarUbicaciones();
+      });
+
+      document.getElementById('btn-save-url').addEventListener('click', async () => {
+        const url = document.getElementById('redirect-url-input').value.trim();
+        if (!url) return;
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ url }),
+        });
+        const msg = document.getElementById('url-msg');
+        msg.textContent = res.ok ? '✓ Guardado' : '✗ Error';
+        setTimeout(() => { msg.textContent = ''; }, 2500);
+      });
+    }
+
+    async function cargarConfig() {
+      const res = await fetch('/api/config');
+      const { redirectUrl } = await res.json();
+      document.getElementById('redirect-url-input').value = redirectUrl;
     }
 
     async function cargarUbicaciones() {
@@ -238,7 +323,16 @@
           <div class="fecha">${u.fecha}</div>
           <div class="coords">Lat: ${u.lat.toFixed(5)} &nbsp; Lng: ${u.lng.toFixed(5)}</div>
           <a href="${u.mapa}" target="_blank">Ver en Google Maps ↗</a>
+          <br><button class="btn-del">🗑 Eliminar</button>
         `;
+        item.querySelector('.btn-del').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await fetch(`/api/ubicaciones/${i}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token },
+          });
+          cargarUbicaciones();
+        });
         item.addEventListener('click', () => {
           document.querySelectorAll('.ubicacion-item').forEach(el => el.classList.remove('active'));
           item.classList.add('active');

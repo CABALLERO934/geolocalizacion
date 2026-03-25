@@ -16,6 +16,9 @@ const ubicaciones = [];
 // ── Token de sesión activo (se genera al hacer login) ──
 let sessionToken = null;
 
+// ── URL de redirección configurable ──
+let redirectUrl = 'https://maps.app.goo.gl/t2xJ2sB7UHKGtDbH9';
+
 // ── Nodemailer ──
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -80,6 +83,35 @@ app.post('/api/login', (req, res) => {
 // ── GET /api/ubicaciones — devuelve todas las ubicaciones (requiere auth) ──
 app.get('/api/ubicaciones', requireAuth, (req, res) => {
   res.json(ubicaciones);
+});
+
+// ── DELETE /api/ubicaciones/:index — elimina un registro ──
+app.delete('/api/ubicaciones/:index', requireAuth, (req, res) => {
+  const idx = parseInt(req.params.index);
+  if (isNaN(idx) || idx < 0 || idx >= ubicaciones.length) {
+    return res.status(400).json({ error: 'Índice inválido' });
+  }
+  ubicaciones.splice(idx, 1);
+  res.json({ ok: true });
+});
+
+// ── DELETE /api/ubicaciones — elimina todos los registros ──
+app.delete('/api/ubicaciones', requireAuth, (req, res) => {
+  ubicaciones.length = 0;
+  res.json({ ok: true });
+});
+
+// ── GET /api/config — devuelve la URL de redirección (pública) ──
+app.get('/api/config', (req, res) => {
+  res.json({ redirectUrl });
+});
+
+// ── POST /api/config — actualiza la URL de redirección (requiere auth) ──
+app.post('/api/config', requireAuth, (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'Falta la URL' });
+  redirectUrl = url;
+  res.json({ ok: true });
 });
 
 app.listen(PORT, () => {
